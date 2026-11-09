@@ -8,8 +8,9 @@ import { Modal } from '../common/Modal'
 
 export const People = () => {
   const { session, refreshCounters } = useSession()
-  const userId = session.user?.id
   const [users, setUsers] = useState([])
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [followingIds, setFollowingIds] = useState(() => new Set())
   const [page, setPage] = useState(1)
   const [pages, setPages] = useState(1)
@@ -18,15 +19,24 @@ export const People = () => {
   const [modal, setModal] = useState(null)
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, 1000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [search])
+
+  useEffect(() => {
     let isActive = true
 
     const loadUsers = async () => {
       setIsLoading(true)
       try {
-        const result = await getUsers(page, session.token)
+        const result = await getUsers(page, debouncedSearch, session.token)
         if (!isActive) return
 
-        setUsers((result.users || []).filter((user) => String(user._id) !== String(userId)))
+        setUsers(result.users || [])
         setFollowingIds(new Set((result.followInfo?.following || []).map(String)))
         setPages(result.pages || 1)
       } catch (error) {
@@ -45,7 +55,7 @@ export const People = () => {
     return () => {
       isActive = false
     }
-  }, [page, session.token, userId])
+  }, [page, debouncedSearch, session.token])
 
   const toggleFollow = async (targetUserId) => {
     if (pendingUserId) return
@@ -82,13 +92,24 @@ export const People = () => {
         <h1 className="content__title">Gente</h1>
       </header>
       <div className="content__posts">
+        <label className="people__search">
+          <span>Buscar por nombre o nick</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Nombre o nick"
+          />
+        </label>
         {isLoading && (
           <div className="people__loading-state">
             <LoadingIndicator label="Cargando usuarios" />
           </div>
         )}
         {!isLoading && users.length === 0 && (
-          <p className="people__status">No hay más usuarios para mostrar.</p>
+          <p className="people__status">
+            {debouncedSearch ? 'No se encontraron personas con ese nombre o nick.' : 'No hay más usuarios para mostrar.'}
+          </p>
         )}
         {!isLoading && users.length > 0 && (
           <ul className="people__list">

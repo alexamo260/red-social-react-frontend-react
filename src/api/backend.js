@@ -105,7 +105,8 @@ const requestAuthenticated = async (url, token, options = {}, delayMs = BACKEND_
   return result
 }
 
-export const getUsers = (page, token) => requestAuthenticated(`/api/list-users/${page}`, token)
+export const getUsers = (page, search, token) =>
+  requestAuthenticated(`/api/list-users/${page}?search=${encodeURIComponent(search)}`, token)
 
 export const followUser = (userId, token) => requestAuthenticated('/api/save-follow', token, {
   method: 'POST',
