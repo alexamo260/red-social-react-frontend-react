@@ -77,8 +77,8 @@ export const uploadUserAvatar = (userId, image, token) => {
   })
 }
 
-export const getPublicationsFeed = (page, token) =>
-  requestAuthenticated(`/api/publications-feed/${page}`, token)
+export const getPublicationsFeed = (page, token, filter = 'recent') =>
+  requestAuthenticated(`/api/publications-feed/${page}?filter=${encodeURIComponent(filter)}`, token)
 
 export const getPublicationsByUser = (userId, token) =>
   requestAuthenticated(`/api/list-publication-by-user/${encodeURIComponent(userId)}`, token)
@@ -87,6 +87,23 @@ export const deletePublication = (publicationId, token) =>
   requestAuthenticated(`/api/delete-publication/${encodeURIComponent(publicationId)}`, token, {
     method: 'DELETE'
   })
+
+export const editPublication = (publicationId, text, token) =>
+  requestAuthenticated(`/api/edit-publication/${encodeURIComponent(publicationId)}`, token, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  })
+
+export const likePublication = (publicationId, token) =>
+  requestAuthenticated(`/api/like-publication/${encodeURIComponent(publicationId)}`, token, {
+    method: 'POST'
+  }, 0)
+
+export const unlikePublication = (publicationId, token) =>
+  requestAuthenticated(`/api/unlike-publication/${encodeURIComponent(publicationId)}`, token, {
+    method: 'DELETE'
+  }, 0)
 
 const requestAuthenticated = async (url, token, options = {}, delayMs = BACKEND_DELAY_MS) => {
   if (delayMs > 0) await waitForBackendDelay(delayMs)

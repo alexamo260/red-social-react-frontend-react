@@ -1042,9 +1042,9 @@ input[type='submit']:hover,
 
 .posts__post {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
     width: 100%;
     margin: 0;
     padding: 22px;
@@ -1065,6 +1065,7 @@ input[type='submit']:hover,
 
 .post__container {
     display: flex;
+    width: 100%;
     min-width: 0;
     flex-direction: row;
     gap: 16px;
@@ -1097,6 +1098,11 @@ input[type='submit']:hover,
     flex-wrap: wrap;
     gap: 4px 10px;
     margin-top: 4px;
+}
+
+.post__body {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .user-info__name {
@@ -1213,6 +1219,51 @@ input[type='submit']:hover,
     font-size: 1.5rem;
 }
 
+.feed__tabbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin: 4px 0 16px;
+    border-bottom: 1px solid var(--color-border-headers);
+}
+
+.feed__tabs {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 4px;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.feed__tab {
+    flex: 0 0 auto;
+    min-height: 42px;
+    padding: 8px 14px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    color: var(--ink-soft);
+    background: transparent;
+    font: inherit;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.feed__tab:hover {
+    border-color: var(--color-border-headers);
+    color: var(--color-general-text);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.feed__tab--active,
+.feed__tab--active:hover {
+    border-bottom-color: var(--color-name-user);
+    color: var(--color-name-user);
+}
+
 .loading-indicator {
     display: flex;
     flex-direction: column;
@@ -1277,17 +1328,98 @@ input[type='submit']:hover,
 
 .feed__refresh-button {
     gap: 8px;
+    flex: 0 0 auto;
+    margin: 0 0 0 auto;
 }
 
 .feed__own-publications {
-    margin-top: 32px;
+    margin-top: 0;
 }
 
 .post__buttons {
     display: flex;
-    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border-headers);
+}
+
+.post__like-button,
+.post__owner-actions {
+    display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.post__like-button {
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--ink-soft);
+    background: transparent;
+    font: inherit;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.post__like-button:hover {
+    border-color: var(--color-border-post);
+    color: var(--accent-coral);
+    background: var(--surface-muted);
+    box-shadow: none;
+    transform: none;
+}
+
+.post__like-button--active,
+.post__like-button--active:hover {
+    color: var(--accent-coral);
+}
+
+.post__like-count {
+    min-width: 1.5em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.post__like-button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.post__owner-actions {
+    flex-wrap: wrap;
+}
+
+.post__edit-textarea {
+    display: block;
+    width: 100%;
+    min-height: 84px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border-textarea);
+    border-radius: 6px;
+    color: var(--color-general-text);
+    background: var(--surface);
+    font: inherit;
+    font-size: 1.6rem;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.post__edit-textarea:focus-visible {
+    outline: 2px solid var(--color-name-user);
+    outline-offset: 2px;
+}
+
+.post__edit-save,
+.post__edit-cancel {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 1.3rem;
 }
 
 .post__button {
@@ -1309,6 +1441,18 @@ input[type='submit']:hover,
 .post__button:hover {
     border-color: var(--color-border-btn-delete-hover);
     background: var(--color-background-btn-delete-hover);
+}
+
+.post__button--edit {
+    border-color: var(--color-border-post);
+    color: var(--color-general-text);
+    background: var(--surface-muted);
+}
+
+.post__button--edit:hover {
+    border-color: var(--color-name-user);
+    color: var(--color-name-user);
+    background: var(--surface-muted);
 }
 
 .content__container-btn {

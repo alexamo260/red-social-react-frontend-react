@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import userAvatar from '../../assets/img/user.png'
-import { deletePublication as deletePublicationRequest, getPublicationsByUser, getPublicationsFeed } from '../../api/backend'
+import {
+    deletePublication as deletePublicationRequest,
+    editPublication as editPublicationRequest,
+    getPublicationsByUser,
+    getPublicationsFeed,
+    likePublication as likePublicationRequest,
+    unlikePublication as unlikePublicationRequest
+} from '../../api/backend'
 import { useSession } from '../../context/SessionContext'
 import { getAvatarUrl } from '../../helpers/avatar'
 import { ImageLightbox } from '../common/ImageLightbox'
@@ -31,12 +38,31 @@ const formatRelativeDate = (date) => {
     return relativeTime.format(Math.round(difference), 'second')
 }
 
-const PublicationCards = ({ publications, fallbackAuthor, onDelete, deletingPublicationId, onOpenImage }) => publications.map((publication) => {
+const PublicationCards = ({
+    publications,
+    fallbackAuthor,
+    currentUserId,
+    allowManage = false,
+    onDelete,
+    deletingPublicationId,
+    onOpenImage,
+    onLike,
+    likingPublicationIds,
+    editingPublicationId,
+    editText,
+    onEditTextChange,
+    onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+    savingPublicationId
+}) => publications.map((publication) => {
     const author = publication.user && typeof publication.user === 'object'
         ? publication.user
         : fallbackAuthor || {}
     const authorName = author.name || author.nick || 'Usuario'
     const authorAvatar = getAvatarUrl(author.image, userAvatar)
+    const isOwnPublication = String(author._id || author.id || publication.user) === String(currentUserId)
+    const isEditing = editingPublicationId === publication._id
 
     return (
         <article className="posts__post" key={publication._id}>
@@ -52,7 +78,17 @@ const PublicationCards = ({ publications, fallbackAuthor, onDelete, deletingPubl
                             {formatRelativeDate(publication.createdAt)}
                         </time>
                     </div>
-                    <p className="post__content">{publication.text}</p>
+                    {isEditing ? (
+                        <textarea
+                            className="post__edit-textarea"
+                            value={editText}
+                            onChange={(event) => onEditTextChange(event.target.value)}
+                            aria-label="Editar texto de la publicación"
+                            rows={3}
+                        />
+                    ) : (
+                        <p className="post__content">{publication.text}</p>
+                    )}
                     {publication.file && (
                         <button
                             className="publication__image-trigger"
@@ -73,23 +109,64 @@ const PublicationCards = ({ publications, fallbackAuthor, onDelete, deletingPubl
                     )}
                 </div>
             </div>
-            {onDelete && (
-                <div className="post__buttons">
-                    <button
-                        className="post__button"
-                        type="button"
-                        aria-label="Eliminar publicación"
-                        title="Eliminar publicación"
-                        disabled={deletingPublicationId === publication._id}
-                        onClick={() => onDelete(publication._id)}
-                    >
-                        <i
-                            className={`fa-solid ${deletingPublicationId === publication._id ? 'fa-spinner fa-spin' : 'fa-trash-can'}`}
-                            aria-hidden="true"
-                        ></i>
-                    </button>
-                </div>
-            )}
+            <div className="post__buttons">
+                <button
+                    className={`post__like-button${publication.likedByMe ? ' post__like-button--active' : ''}`}
+                    type="button"
+                    aria-label={publication.likedByMe ? 'Retirar me gusta' : 'Me gusta'}
+                    aria-pressed={Boolean(publication.likedByMe)}
+                    disabled={likingPublicationIds.has(publication._id)}
+                    onClick={() => onLike(publication)}
+                >
+                    <i className={`fa-${publication.likedByMe ? 'solid' : 'regular'} fa-heart`} aria-hidden="true"></i>
+                    <span>{publication.likedByMe ? 'Te gusta' : 'Me gusta'}</span>
+                    <span className="post__like-count">{publication.likesCount || 0}</span>
+                </button>
+                {isOwnPublication && allowManage && (
+                    <div className="post__owner-actions">
+                        {isEditing ? (
+                            <>
+                                <button
+                                    className="content__button post__edit-save"
+                                    type="button"
+                                    disabled={!editText.trim() || savingPublicationId === publication._id}
+                                    onClick={() => onSaveEdit(publication._id)}
+                                >
+                                    {savingPublicationId === publication._id ? 'Guardando...' : 'Guardar'}
+                                </button>
+                                <button className="content__button post__edit-cancel" type="button" onClick={onCancelEdit}>
+                                    Cancelar
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    className="post__button post__button--edit"
+                                    type="button"
+                                    aria-label="Editar publicación"
+                                    title="Editar publicación"
+                                    onClick={() => onStartEdit(publication)}
+                                >
+                                    <i className="fa-solid fa-pen" aria-hidden="true"></i>
+                                </button>
+                                <button
+                                    className="post__button"
+                                    type="button"
+                                    aria-label="Eliminar publicación"
+                                    title="Eliminar publicación"
+                                    disabled={deletingPublicationId === publication._id}
+                                    onClick={() => onDelete(publication._id)}
+                                >
+                                    <i
+                                        className={`fa-solid ${deletingPublicationId === publication._id ? 'fa-spinner fa-spin' : 'fa-trash-can'}`}
+                                        aria-hidden="true"
+                                    ></i>
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
         </article>
     )
 })
@@ -100,9 +177,14 @@ export const Feed = () => {
     const [myPublications, setMyPublications] = useState([])
     const [page, setPage] = useState(1)
     const [pages, setPages] = useState(1)
+    const [activeTab, setActiveTab] = useState('publications')
     const [isLoading, setIsLoading] = useState(true)
     const [isLoadingMine, setIsLoadingMine] = useState(true)
     const [deletingPublicationId, setDeletingPublicationId] = useState(null)
+    const [likingPublicationIds, setLikingPublicationIds] = useState(() => new Set())
+    const [editingPublicationId, setEditingPublicationId] = useState(null)
+    const [editText, setEditText] = useState('')
+    const [savingPublicationId, setSavingPublicationId] = useState(null)
     const [refreshVersion, setRefreshVersion] = useState(0)
     const [observedPublicationCount, setObservedPublicationCount] = useState(undefined)
     const [modal, setModal] = useState(null)
@@ -186,6 +268,66 @@ export const Feed = () => {
         setRefreshVersion((version) => version + 1)
     }
 
+    const updatePublicationLists = (publicationId, update) => {
+        setPublications((current) => current.map((publication) =>
+            publication._id === publicationId ? { ...publication, ...update } : publication
+        ))
+        setMyPublications((current) => current.map((publication) =>
+            publication._id === publicationId ? { ...publication, ...update } : publication
+        ))
+    }
+
+    const handleToggleLike = async (publication) => {
+        if (likingPublicationIds.has(publication._id)) return
+
+        setLikingPublicationIds((current) => new Set(current).add(publication._id))
+        try {
+            const result = publication.likedByMe
+                ? await unlikePublicationRequest(publication._id, session.token)
+                : await likePublicationRequest(publication._id, session.token)
+            updatePublicationLists(publication._id, {
+                likesCount: result.likesCount,
+                likedByMe: result.likedByMe
+            })
+        } catch (error) {
+            setModal({
+                type: 'error',
+                message: error instanceof Error ? error.message : 'No se pudo actualizar el me gusta.'
+            })
+        } finally {
+            setLikingPublicationIds((current) => {
+                const next = new Set(current)
+                next.delete(publication._id)
+                return next
+            })
+        }
+    }
+
+    const startEditingPublication = (publication) => {
+        setEditingPublicationId(publication._id)
+        setEditText(publication.text || '')
+    }
+
+    const handleSaveEdit = async (publicationId) => {
+        if (!editText.trim() || savingPublicationId) return
+
+        setSavingPublicationId(publicationId)
+        try {
+            const updatedPublication = await editPublicationRequest(publicationId, editText.trim(), session.token)
+            updatePublicationLists(publicationId, updatedPublication)
+            setEditingPublicationId(null)
+            setEditText('')
+            setModal({ type: 'success', message: 'Publicación actualizada correctamente.' })
+        } catch (error) {
+            setModal({
+                type: 'error',
+                message: error instanceof Error ? error.message : 'No se pudo editar la publicación.'
+            })
+        } finally {
+            setSavingPublicationId(null)
+        }
+    }
+
     const handleDeletePublication = async (publicationId) => {
         if (deletingPublicationId) return
 
@@ -193,7 +335,9 @@ export const Feed = () => {
         try {
             await deletePublicationRequest(publicationId, session.token)
             setMyPublications((current) => current.filter((publication) => publication._id !== publicationId))
+            setPublications((current) => current.filter((publication) => publication._id !== publicationId))
             await refreshCounters()
+            setModal({ type: 'success', message: 'Publicación eliminada correctamente.' })
         } catch (error) {
             setModal({
                 type: 'error',
@@ -219,21 +363,67 @@ export const Feed = () => {
     <>
       <header className="content__header">
           <h1 className="content__title">Publicaciones</h1>
-                    <button className="content__button feed__refresh-button" type="button" onClick={refreshFeed} disabled={isLoading}>
-                        <i className={`fa-solid fa-arrows-rotate${isLoading ? ' fa-spin' : ''}`} aria-hidden="true"></i>
-                        Actualizar
-                    </button>
       </header>
 
-            <div className="content__posts" aria-busy={isLoading}>
+            <div className="feed__tabbar">
+              <div className="feed__tabs" role="tablist" aria-label="Secciones de publicaciones">
+                <button
+                    id="feed-tab-publications"
+                    className={`feed__tab${activeTab === 'publications' ? ' feed__tab--active' : ''}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'publications'}
+                    aria-controls="feed-publications-panel"
+                    onClick={() => setActiveTab('publications')}
+                >
+                    Publicaciones
+                </button>
+                <button
+                    id="feed-tab-mine"
+                    className={`feed__tab${activeTab === 'mine' ? ' feed__tab--active' : ''}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'mine'}
+                    aria-controls="feed-mine-panel"
+                    onClick={() => setActiveTab('mine')}
+                >
+                    Mis publicaciones
+                </button>
+                            </div>
+                            {activeTab === 'publications' && (
+                                <button className="content__button feed__refresh-button" type="button" onClick={refreshFeed} disabled={isLoading}>
+                                        <i className={`fa-solid fa-arrows-rotate${isLoading ? ' fa-spin' : ''}`} aria-hidden="true"></i>
+                                        Actualizar
+                                </button>
+                            )}
+            </div>
+
+            {activeTab === 'publications' && (
+            <div id="feed-publications-panel" role="tabpanel" aria-labelledby="feed-tab-publications" aria-busy={isLoading}>
+              <div className="content__posts">
                 {isLoading && publications.length === 0 && <LoadingIndicator label="Cargando publicaciones" />}
                 {!isLoading && publications.length === 0 && (
-                    <p className="feed__status">Todavía no hay publicaciones. Sigue a alguien o publica algo.</p>
+                    <p className="feed__status">Todavía no hay publicaciones.</p>
                 )}
-                <PublicationCards publications={publications} onOpenImage={setSelectedImage} />
-      </div>
+                    <PublicationCards
+                        publications={publications}
+                        currentUserId={userId}
+                        onOpenImage={setSelectedImage}
+                        onLike={handleToggleLike}
+                        likingPublicationIds={likingPublicationIds}
+                        editingPublicationId={editingPublicationId}
+                        editText={editText}
+                        onEditTextChange={setEditText}
+                        onStartEdit={startEditingPublication}
+                        onCancelEdit={() => { setEditingPublicationId(null); setEditText('') }}
+                        onSaveEdit={handleSaveEdit}
+                        savingPublicationId={savingPublicationId}
+                        onDelete={requestDeletePublication}
+                        deletingPublicationId={deletingPublicationId}
+                    />
+          </div>
 
-            {page < pages && (
+            {publications.length > 0 && page < pages && (
                 <div className="content__container-btn">
                     <button
                         className="content__btn-more-post"
@@ -247,11 +437,11 @@ export const Feed = () => {
                     </button>
                 </div>
             )}
+            </div>
+            )}
 
-            <section className="feed__own-publications">
-                <header className="content__header">
-                    <h2 className="content__title">Mis publicaciones</h2>
-                </header>
+            {activeTab === 'mine' && (
+            <section id="feed-mine-panel" className="feed__own-publications" role="tabpanel" aria-labelledby="feed-tab-mine" aria-busy={isLoadingMine}>
                 <div className="content__posts" aria-busy={isLoadingMine}>
                     {isLoadingMine && <LoadingIndicator label="Cargando tus publicaciones" />}
                     {!isLoadingMine && myPublications.length === 0 && (
@@ -261,13 +451,25 @@ export const Feed = () => {
                         <PublicationCards
                             publications={myPublications}
                             fallbackAuthor={session.user}
+                            currentUserId={userId}
+                            allowManage
                             onDelete={requestDeletePublication}
                             deletingPublicationId={deletingPublicationId}
                             onOpenImage={setSelectedImage}
+                            onLike={handleToggleLike}
+                            likingPublicationIds={likingPublicationIds}
+                            editingPublicationId={editingPublicationId}
+                            editText={editText}
+                            onEditTextChange={setEditText}
+                            onStartEdit={startEditingPublication}
+                            onCancelEdit={() => { setEditingPublicationId(null); setEditText('') }}
+                            onSaveEdit={handleSaveEdit}
+                            savingPublicationId={savingPublicationId}
                         />
                     )}
                 </div>
             </section>
+            )}
 
             <Modal {...modal} onClose={() => setModal(null)} />
             <ImageLightbox
